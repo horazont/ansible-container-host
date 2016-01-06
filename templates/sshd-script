@@ -1,0 +1,2 @@
+#!/bin/bash
+exec virsh -c lxc:/// lxc-enter-namespace --noseclabel {{ item.name }} -- /usr/sbin/sshd -i

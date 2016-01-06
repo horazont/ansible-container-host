@@ -1,0 +1,29 @@
+<domain type="lxc">
+  <name>{{ item.name }}</name>
+  <title>{{ item.title }}</title>
+  <memory>262144</memory>
+  <os>
+    <type>exe</type>
+    <init>/sbin/init</init>
+  </os>
+  <vcpu>1</vcpu>
+  <clock offset="utc" />
+  <devices>
+    <emulator>/usr/{{ "lib/libvirt" if ansible_os_family == "Debian" else "libexec" }}/libvirt_lxc</emulator>
+    <filesystem type="mount">
+      <source dir="/var/lib/lxc/{{ item.rootfs_name }}/rootfs/" />
+      <target dir="/" />
+    </filesystem>
+    {% for fs_info in (item.mounts | default([])) %}
+    <filesystem type="mount">
+      <source dir="{{ fs_info.host }}" />
+      <target dir="{{ fs_info.guest }}" />
+    </filesystem>
+    {% endfor %}
+    <interface type="network">
+      <source network="for-all-containers" />
+      <mac address="{{ item.mac }}"/>
+    </interface>
+    <console type="pty" />
+  </devices>
+</domain>

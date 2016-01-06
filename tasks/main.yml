@@ -1,0 +1,183 @@
+---
+- name: install libvirt and tools
+  apt: name={{ item }} state=latest
+  when: ansible_pkg_mgr == "apt"
+  with_items:
+  - libvirt0
+  - lxc
+  - python-libvirt
+  - python3
+  tags:
+  - container-host
+
+- name: install libvirt and tools
+  dnf: name={{ item }} state=latest
+  when: ansible_pkg_mgr == "dnf"
+  with_items:
+  - lxc
+  - lxc-templates
+  - libvirt
+  - libvirt-daemon-lxc
+  - libvirt-python
+  - python3
+  tags:
+  - container-host
+
+- name: install debian 8 specific packages
+  apt: name={{ item }} state=latest
+  when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
+  with_items:
+  - libvirt-bin
+  tags:
+  - container-host
+
+- name: ensure libvirt is running
+  service: name=libvirtd state=running
+  tags:
+  - container-host
+
+- name: ensure ansible working directory is present
+  file: path={{ persistent_ansible_directory }}/container-host/
+        mode=u=rwx,go-rwx
+        state=directory
+  tags:
+  - container-host
+
+- name: copy host network configuration
+  copy: src=libvirt/host-network-base.xml
+        dest={{ persistent_ansible_directory }}/container-host/host-network.xml
+        mode=u=r,go-rwx
+        owner=root
+        group=root
+  register: host_network_changed
+  tags:
+  - container-host
+
+- name: bootstrap host network
+  command: virsh -c lxc:/// net-define {{ persistent_ansible_directory }}/container-host/host-network.xml
+  args:
+    creates: /etc/libvirt/qemu/networks/for-all-containers.xml
+  when: host_network_changed | changed
+  tags:
+  - container-host
+
+- name: start host network
+  command: virsh -c lxc:/// net-start for-all-containers
+  args:
+    creates: /etc/libvirt/qemu/networks/for-all-containers.xml
+  when: host_network_changed | changed
+  tags:
+  - container-host
+
+- name: add guest to host network
+  command: virsh -c lxc:/// net-update for-all-containers add-last ip-dhcp-host "<host mac='{{ item.mac }}' ip='{{ item.ip }}'/>" --live --config
+  register: add_guest
+  changed_when: add_guest.rc == 0
+  failed_when: False
+  with_items: containers
+  tags:
+  - container-host
+
+- name: set host network to auto start
+  command: virsh -c lxc:/// net-autostart for-all-containers
+  args:
+    creates: /etc/libvirt/qemu/networks/autostart/for-all-containers.xml
+  tags:
+  - container-host
+
+- name: update grub config to generate cgroup_enable=memory
+  lineinfile: dest=/etc/default/grub
+              regexp='^GRUB_CMDLINE_LINUX='
+              line='GRUB_CMDLINE_LINUX="cgroup_enable=memory"'
+  register: grub_update
+  when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
+  tags:
+  - container-host
+
+- name: re-generate grub config
+  command: update-grub
+  when: grub_update | changed
+  tags:
+  - container-host
+
+- name: create containers
+  command: lxc-create -t {{ item.template | default("debian") }} -n {{ item.rootfs_name }} -- --release {{ item.template_release | default("jessie") }}
+  args:
+    creates: /var/lib/lxc/{{ item.rootfs_name }}
+  with_items: containers
+  tags:
+  - container-host
+  - guest-setup
+
+- name: create source directories for fs mounts if they do not exist
+  file: path="{{ item.1.host }}"
+        state=directory
+  with_subelements:
+  - containers
+  - mounts
+  tags:
+  - container-host
+  - guest-setup
+
+- name: define container
+  virt: command=define
+        xml='{{ lookup("template", "../templates/libvirt/container.xml") }}'
+        uri=lxc:///
+        name={{ item.name }}
+  with_items: containers
+  tags:
+  - container-host
+  - guest-setup
+
+- name: start container
+  virt: state=running name={{ item.name }} uri=lxc:///
+  with_items: containers
+  tags:
+    - container-host
+    - guest-setup
+
+- name: autostart container
+  virt: name={{ item.name }} uri=lxc:/// command=autostart
+  with_items: containers
+  tags:
+  - container-host
+  - guest-setup
+
+- name: shellscript to connect to sshd
+  template: src=sshd-script dest=/usr/local/bin/virt-{{ item.name }}-sshd mode=ugo=rx
+  with_items: containers
+  tags:
+  - container-host
+  - guest-setup
+
+- name: admin group for container
+  group: state=present "name={{ item.name }}-admin"
+  with_items: containers
+  tags:
+  - container-host
+  - guest-setup
+
+- name: root keys for container
+  authorized_key:
+    user=root
+    path="/var/lib/lxc/{{ item.rootfs_name }}/rootfs/root/.ssh/authorized_keys"
+    state=present
+    exclusive=yes
+    key="{% for admin in admins if ('_' + item.name + '.' + admin_setup.name) in (admin.targets | default([])) -%}{{ admin['keys'] | join('\n') }}{{ '\n' }}{%- endfor %}"
+  with_items: containers
+  tags:
+  - container-host
+  - guest-setup
+  - admin-accounts
+
+- name: setup firewall to allow traffic with the containers
+  copy:
+    src=etc/ferm/ferm.d/05-container-network.conf
+    dest=/etc/ferm/ferm.d/05-container-network.conf
+    owner=root group=root mode=0700
+  tags:
+  - container-host
+  - ferm
+  notify:
+  - run ferm
+  when: ferm
