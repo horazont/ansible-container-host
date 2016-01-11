@@ -20,6 +20,7 @@
   - libvirt-daemon-lxc
   - libvirt-python
   - python3
+  - debootstrap
   tags:
   - container-host
 
@@ -43,45 +44,51 @@
   tags:
   - container-host
 
-- name: copy host network configuration
-  copy: src=libvirt/host-network-base.xml
-        dest={{ persistent_ansible_directory }}/container-host/host-network.xml
-        mode=u=r,go-rwx
-        owner=root
-        group=root
+- name: create host network configurations
+  template:
+    src: libvirt/host-network.xml
+    dest: "{{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml"
+    mode: u=r,go-rwx
+    owner: root
+    group: root
   register: host_network_changed
+  with_items: networks
   tags:
   - container-host
 
 - name: bootstrap host network
-  command: virsh -c lxc:/// net-define {{ persistent_ansible_directory }}/container-host/host-network.xml
+  command: virsh -c lxc:/// net-define {{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml
   args:
-    creates: /etc/libvirt/qemu/networks/for-all-containers.xml
-  when: host_network_changed | changed
+    creates: /etc/libvirt/qemu/networks/{{ item.name }}.xml
+  with_items: networks
   tags:
   - container-host
 
 - name: start host network
-  command: virsh -c lxc:/// net-start for-all-containers
-  args:
-    creates: /etc/libvirt/qemu/networks/for-all-containers.xml
-  when: host_network_changed | changed
+  command: virsh -c lxc:/// net-start {{ item.name }}
+  with_items: networks
+  register: start_network
+  changed_when: start_network.rc == 0
+  failed_when: "start_network.rc != 0 and 'is already active' not in start_network.stderr"
   tags:
   - container-host
 
-- name: add guest to host network
-  command: virsh -c lxc:/// net-update for-all-containers add-last ip-dhcp-host "<host mac='{{ item.mac }}' ip='{{ item.ip }}'/>" --live --config
+- name: add guests to host networks
+  command: virsh -c lxc:/// net-update {{ item.1.net }} add-last ip-dhcp-host "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip }}'/>" --live --config
   register: add_guest
   changed_when: add_guest.rc == 0
   failed_when: False
-  with_items: containers
+  with_subelements:
+  - containers
+  - networks
   tags:
   - container-host
 
 - name: set host network to auto start
-  command: virsh -c lxc:/// net-autostart for-all-containers
+  command: virsh -c lxc:/// net-autostart {{ item.name }}
   args:
-    creates: /etc/libvirt/qemu/networks/autostart/for-all-containers.xml
+    creates: /etc/libvirt/qemu/networks/autostart/{{ item.name }}.xml
+  with_items: networks
   tags:
   - container-host
 
@@ -120,10 +127,11 @@
   - guest-setup
 
 - name: define container
-  virt: command=define
-        xml='{{ lookup("template", "../templates/libvirt/container.xml") }}'
-        uri=lxc:///
-        name={{ item.name }}
+  virt:
+    command: define
+    xml: '{{ lookup("template", "../templates/libvirt/container.xml") }}'
+    uri: lxc:///
+    name: '{{ item.name }}'
   with_items: containers
   tags:
   - container-host
@@ -174,6 +182,24 @@
   copy:
     src=etc/ferm/ferm.d/05-container-network.conf
     dest=/etc/ferm/ferm.d/05-container-network.conf
+    owner=root group=root mode=0700
+  tags:
+  - container-host
+  - ferm
+  notify:
+  - run ferm
+  when: ferm
+
+- name: foo
+  debug:
+    msg: "{{ nat_port_forwarding }}"
+  tags:
+  - container-host
+
+- name: setup firewall for nat port forwarding
+  template:
+    src=forwarding-ferm.conf
+    dest=/etc/ferm/ferm.d/05-container-forwarding.conf
     owner=root group=root mode=0700
   tags:
   - container-host

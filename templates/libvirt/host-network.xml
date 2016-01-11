@@ -1,0 +1,16 @@
+<network>
+  <name>{{ item.name }}</name>
+  {% if (item.mode | default("nat")) == "nat" %}
+  <forward type="nat">
+    <nat>
+    </nat>
+  </forward>
+  {% endif %}
+  <bridge name="{{ item.iface }}" stp="on" delay="0" />
+  <ip address="{{ item.addr }}" netmask="{{ item.netmask }}">
+    <dhcp/>
+  </ip>
+  {% for route in item.routes | default([]) %}
+  <route family="{{ route.family }}" address="{{ route.address }}" prefix="{{ route.prefix }}" gateway="{{ route.gateway }}"/>
+  {% endfor %}
+</network>

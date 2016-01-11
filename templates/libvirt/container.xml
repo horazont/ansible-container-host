@@ -20,10 +20,20 @@
       <target dir="{{ fs_info.guest }}" />
     </filesystem>
     {% endfor %}
+    {% for net in item.networks %}
     <interface type="network">
-      <source network="for-all-containers" />
-      <mac address="{{ item.mac }}"/>
+      <source network="{{ net.net }}" />
+      <mac address="{{ net.mac }}"/>
+      {% if net.guest_ifname | default("") %}
+      <guest dev="{{ net.guest_ifname }}" />
+      {% endif %}
     </interface>
+    {% endfor %}
+    <hostdev mode="capabilities" type="misc">
+      <source>
+        <char>/dev/net/tun</char>
+      </source>
+    </hostdev>
     <console type="pty" />
   </devices>
 </domain>
