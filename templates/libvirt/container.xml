@@ -7,12 +7,21 @@
     <init>/sbin/init</init>
   </os>
   <vcpu>1</vcpu>
+  {% if item.idmap | default(False) %}
+  <idmap>
+    <uid start='0' target="{{ item.idmap.base }}" count="{{ item.idmap.count }}" />
+    <gid start='0' target="{{ item.idmap.base }}" count="{{ item.idmap.count }}"/>
+  </idmap>
+  {% endif %}
   <clock offset="utc" />
   <devices>
     <emulator>/usr/{{ "lib/libvirt" if ansible_os_family == "Debian" else "libexec" }}/libvirt_lxc</emulator>
     <filesystem type="mount">
       <source dir="/var/lib/lxc/{{ item.rootfs_name }}/rootfs/" />
       <target dir="/" />
+      {% if item.rootfs_quota | default(False) %}
+      <space_hard_limit>{{ item.rootfs_quota }}</space_hard_limit>
+      {% endif %}
     </filesystem>
     {% for fs_info in (item.mounts | default([])) %}
     <filesystem type="mount">
@@ -26,6 +35,9 @@
       <mac address="{{ net.mac }}"/>
       {% if net.guest_ifname | default("") %}
       <guest dev="{{ net.guest_ifname }}" />
+      {% endif %}
+      {% if net.host_ifname | default("") %}
+      <target dev="{{ net.host_ifname }}" />
       {% endif %}
     </interface>
     {% endfor %}

@@ -113,13 +113,47 @@
   args:
     creates: /var/lib/lxc/{{ item.rootfs_name }}
   with_items: containers
+  register: container_created
   tags:
   - container-host
   - guest-setup
 
+- name: rebase ids
+  script: rebase-ids.py "/var/lib/lxc/{{ item.item.rootfs_name }}" "{{ item.item.idmap.base }}"
+  when: (item | changed) and (item.item.idmap | default(False))
+  with_items: container_created.results | default([])
+  tags:
+  - container-host
+  - guest-setup
+
+- name: ensure that lxc does not think these are meant for it
+  file:
+    state: absent
+    path: "/var/lib/lxc/{{ item.rootfs_name }}/config"
+  with_items: containers
+  tags:
+  - guest-setup
+  - container-host
+
 - name: create source directories for fs mounts if they do not exist
-  file: path="{{ item.1.host }}"
-        state=directory
+  file:
+    path: "{{ item.1.host }}"
+    state: directory
+    owner: "{{ item.1.owner | default((item.0.idmap | default({})).base | default(0)) }}"
+    group: "{{ item.1.group | default((item.0.idmap | default({})).base | default(0)) }}"
+  with_subelements:
+  - containers
+  - mounts
+  tags:
+  - container-host
+  - guest-setup
+
+- name: create destination directories for fs mounts if they do not exist
+  file:
+    path: "/var/lib/lxc/{{ item.0.rootfs_name }}{{ item.1.guest }}"
+    owner: "{{ (item.0.idmap | default({})).base | default(0) }}"
+    group: "{{ (item.0.idmap | default({})).base | default(0) }}"
+    state: directory
   with_subelements:
   - containers
   - mounts
@@ -166,45 +200,46 @@
   - container-host
   - guest-setup
 
-- name: root keys for container
-  authorized_key:
-    user=root
-    path="/var/lib/lxc/{{ item.rootfs_name }}/rootfs/root/.ssh/authorized_keys"
-    state=present
-    exclusive=yes
-    key="{% for admin in admins if ('_' + item.name + '.' + admin_setup.name) in (admin.targets | default([])) -%}{{ admin['keys'] | join('\n') }}{{ '\n' }}{%- endfor %}"
+- name: "root keys for container: .ssh"
+  file:
+    owner: "{{ (item.idmap | default({})).base | default(0) }}"
+    group: "{{ (item.idmap | default({})).base | default(0) }}"
+    state: directory
+    recurse: yes
+    path: "/var/lib/lxc/{{ item.rootfs_name }}/rootfs/root/.ssh/"
+    mode: u=rwx,go-rwx
   with_items: containers
+  when: item.manage_keys | default(True)
+  tags:
+  - guest-setup
+  - admin-accounts
+  - container-host
+
+- name: "root keys for container: authorized_keys"
+  copy:
+    dest: "/var/lib/lxc/{{ item.rootfs_name }}/rootfs/root/.ssh/authorized_keys"
+    content: "{% for admin in admins if ('_' + item.name + '.' + admin_setup.name) in (admin.targets | default([])) -%}{{ admin['keys'] | join('\n') }}{{ '\n' }}{%- endfor %}"
+    owner: "{{ (item.idmap | default({})).base | default(0) }}"
+    group: "{{ (item.idmap | default({})).base | default(0) }}"
+    mode: u=rw,go-rwx
+  with_items: containers
+  when: item.manage_keys | default(True)
   tags:
   - container-host
   - guest-setup
   - admin-accounts
 
-- name: setup firewall to allow traffic with the containers
-  copy:
-    src=etc/ferm/ferm.d/05-container-network.conf
-    dest=/etc/ferm/ferm.d/05-container-network.conf
-    owner=root group=root mode=0700
-  tags:
-  - container-host
-  - ferm
-  notify:
-  - run ferm
-  when: ferm
-
-- name: foo
-  debug:
-    msg: "{{ nat_port_forwarding }}"
-  tags:
-  - container-host
-
 - name: setup firewall for nat port forwarding
   template:
-    src=forwarding-ferm.conf
-    dest=/etc/ferm/ferm.d/05-container-forwarding.conf
-    owner=root group=root mode=0700
+    src: forwarding-ferm.conf
+    dest: /etc/ferm/ferm.d/05-container-forwarding.conf
+    owner: root
+    group: root
+    mode: u=rw,go-rwx
   tags:
   - container-host
   - ferm
+  - test
   notify:
   - run ferm
   when: ferm
