@@ -3,6 +3,11 @@
   apt: name={{ item }} state=latest
   when: ansible_pkg_mgr == "apt"
   with_items:
+  - ebtables
+  - dnsmasq-base
+  - dns-root-data
+  - debootstrap
+  - rsync
   - libvirt0
   - lxc
   - python-libvirt
@@ -30,6 +35,12 @@
   when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
   with_items:
   - libvirt-bin
+  tags:
+  - container-host
+
+- name: disable and stop dnsmasq
+  service: name=dnsmasq state=stopped enabled=no
+  when: ansible_distribution == "Debian"
   tags:
   - container-host
 
