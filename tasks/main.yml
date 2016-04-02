@@ -250,7 +250,6 @@
   tags:
   - container-host
   - ferm
-  - test
   notify:
   - run ferm
   when: ferm
