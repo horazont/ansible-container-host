@@ -41,6 +41,7 @@
 - name: disable and stop dnsmasq
   service: name=dnsmasq state=stopped enabled=no
   when: ansible_distribution == "Debian"
+  failed_when: "{{ False }}"
   tags:
   - container-host
 
@@ -64,7 +65,7 @@
     owner: root
     group: root
   register: host_network_changed
-  with_items: networks
+  with_items: "{{ networks }}"
   tags:
   - container-host
 
@@ -72,13 +73,13 @@
   command: virsh -c lxc:/// net-define {{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml
   args:
     creates: /etc/libvirt/qemu/networks/{{ item.name }}.xml
-  with_items: networks
+  with_items: "{{ networks }}"
   tags:
   - container-host
 
 - name: start host network
   command: virsh -c lxc:/// net-start {{ item.name }}
-  with_items: networks
+  with_items: "{{ networks }}"
   register: start_network
   changed_when: start_network.rc == 0
   failed_when: "start_network.rc != 0 and 'is already active' not in start_network.stderr"
@@ -88,10 +89,10 @@
 - name: add guests to host networks
   command: virsh -c lxc:/// net-update {{ item.1.net }} add-last ip-dhcp-host "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip }}'/>" --live --config
   register: add_guest
-  changed_when: add_guest.rc == 0
+  changed_when: "{{ add_guest.rc == 0 }}"
   failed_when: False
   with_subelements:
-  - containers
+  - "{{ containers }}"
   - networks
   tags:
   - container-host
@@ -100,7 +101,7 @@
   command: virsh -c lxc:/// net-autostart {{ item.name }}
   args:
     creates: /etc/libvirt/qemu/networks/autostart/{{ item.name }}.xml
-  with_items: networks
+  with_items: "{{ networks }}"
   tags:
   - container-host
 
@@ -123,7 +124,7 @@
   command: lxc-create -t {{ item.template | default("debian") }} -n {{ item.rootfs_name }} -- --release {{ item.template_release | default("jessie") }}
   args:
     creates: /var/lib/lxc/{{ item.rootfs_name }}
-  with_items: containers
+  with_items: "{{ containers }}"
   register: container_created
   tags:
   - container-host
@@ -132,7 +133,7 @@
 - name: rebase ids
   script: rebase-ids.py "/var/lib/lxc/{{ item.item.rootfs_name }}" "{{ item.item.idmap.base }}"
   when: (item | changed) and (item.item.idmap | default(False))
-  with_items: container_created.results | default([])
+  with_items: "{{ container_created.results | default([]) }}"
   tags:
   - container-host
   - guest-setup
@@ -141,7 +142,7 @@
   file:
     state: absent
     path: "/var/lib/lxc/{{ item.rootfs_name }}/config"
-  with_items: containers
+  with_items: "{{ containers }}"
   tags:
   - guest-setup
   - container-host
@@ -153,7 +154,7 @@
     owner: "{{ item.1.owner | default((item.0.idmap | default({})).base | default(0)) }}"
     group: "{{ item.1.group | default((item.0.idmap | default({})).base | default(0)) }}"
   with_subelements:
-  - containers
+  - "{{ containers }}"
   - mounts
   tags:
   - container-host
@@ -166,7 +167,7 @@
     group: "{{ (item.0.idmap | default({})).base | default(0) }}"
     state: directory
   with_subelements:
-  - containers
+  - "{{ containers }}"
   - mounts
   tags:
   - container-host
@@ -178,35 +179,37 @@
     xml: '{{ lookup("template", "../templates/libvirt/container.xml") }}'
     uri: lxc:///
     name: '{{ item.name }}'
-  with_items: containers
+  with_items: "{{ containers }}"
   tags:
   - container-host
   - guest-setup
 
 - name: start container
   virt: state=running name={{ item.name }} uri=lxc:///
-  with_items: containers
+  with_items: "{{ containers }}"
   tags:
     - container-host
     - guest-setup
 
 - name: autostart container
   virt: name={{ item.name }} uri=lxc:/// command=autostart
-  with_items: containers
+  with_items: "{{ containers }}"
   tags:
   - container-host
   - guest-setup
 
 - name: shellscript to connect to sshd
   template: src=sshd-script dest=/usr/local/bin/virt-{{ item.name }}-sshd mode=ugo=rx
-  with_items: containers
+  with_items: "{{ containers }}"
   tags:
   - container-host
   - guest-setup
 
 - name: admin group for container
-  group: state=present "name={{ item.name }}-admin"
-  with_items: containers
+  group: 
+    state: present 
+    name: "{{ item.name }}-admin"
+  with_items: "{{ containers }}"
   tags:
   - container-host
   - guest-setup
@@ -219,7 +222,7 @@
     recurse: yes
     path: "/var/lib/lxc/{{ item.rootfs_name }}/rootfs/root/.ssh/"
     mode: u=rwx,go-rwx
-  with_items: containers
+  with_items: "{{ containers }}"
   when: item.manage_keys | default(True)
   tags:
   - guest-setup
@@ -233,7 +236,7 @@
     owner: "{{ (item.idmap | default({})).base | default(0) }}"
     group: "{{ (item.idmap | default({})).base | default(0) }}"
     mode: u=rw,go-rwx
-  with_items: containers
+  with_items: "{{ containers }}"
   when: item.manage_keys | default(True)
   tags:
   - container-host
