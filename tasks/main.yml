@@ -156,6 +156,7 @@
   with_subelements:
   - "{{ containers }}"
   - mounts
+  when: "{{ item.set_uid | default(True) }}"
   tags:
   - container-host
   - guest-setup
@@ -206,8 +207,8 @@
   - guest-setup
 
 - name: admin group for container
-  group: 
-    state: present 
+  group:
+    state: present
     name: "{{ item.name }}-admin"
   with_items: "{{ containers }}"
   tags:
