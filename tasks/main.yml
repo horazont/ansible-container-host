@@ -227,6 +227,7 @@
   when: item.manage_keys | default(True)
   tags:
   - guest-setup
+  - guest-setup-admin-accounts
   - admin-accounts
   - container-host
 
@@ -242,6 +243,7 @@
   tags:
   - container-host
   - guest-setup
+  - guest-setup-admin-accounts
   - admin-accounts
 
 - name: setup firewall for nat port forwarding
