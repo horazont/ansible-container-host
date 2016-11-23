@@ -161,15 +161,25 @@
   - container-host
   - guest-setup
 
-- name: create destination directories for fs mounts if they do not exist
-  file:
-    path: "/var/lib/lxc/{{ item.0.rootfs_name }}{{ item.1.guest }}"
-    owner: "{{ (item.0.idmap | default({})).base | default(0) }}"
-    group: "{{ (item.0.idmap | default({})).base | default(0) }}"
-    state: directory
+- name: check if destination directories for fs mounts exist
+  command: test -d '/var/lib/lxc/{{ item.0.rootfs_name }}{{ item.1.guest }}'
+  register: mount_dirs
+  changed_when: mount_dirs.rc == 1
   with_subelements:
   - "{{ containers }}"
   - mounts
+  tags:
+  - container-host
+  - guest-setup
+
+- name: create destination directories for fs mounts if they do not exist
+  file:
+    path: "/var/lib/lxc/{{ item.item.0.rootfs_name }}{{ item.item.1.guest }}"
+    owner: "{{ (item.item.0.idmap | default({})).base | default(0) }}"
+    group: "{{ (item.item.0.idmap | default({})).base | default(0) }}"
+    state: directory
+  when: "{{ item | changed }}"
+  with_items: "{{ mount_dirs.results }}"
   tags:
   - container-host
   - guest-setup
