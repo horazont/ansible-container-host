@@ -151,8 +151,6 @@
   file:
     path: "{{ item.1.host }}"
     state: directory
-    owner: "{{ item.1.owner | default((item.0.idmap | default({})).base | default(0)) }}"
-    group: "{{ item.1.group | default((item.0.idmap | default({})).base | default(0)) }}"
   with_subelements:
   - "{{ containers }}"
   - mounts
@@ -164,7 +162,8 @@
 - name: check if destination directories for fs mounts exist
   command: test -d '/var/lib/lxc/{{ item.0.rootfs_name }}{{ item.1.guest }}'
   register: mount_dirs
-  changed_when: mount_dirs.rc == 1
+  changed_when: "{{ mount_dirs.rc == 1 }}"
+  failed_when: "{{ False }}"
   with_subelements:
   - "{{ containers }}"
   - mounts
@@ -175,8 +174,6 @@
 - name: create destination directories for fs mounts if they do not exist
   file:
     path: "/var/lib/lxc/{{ item.item.0.rootfs_name }}{{ item.item.1.guest }}"
-    owner: "{{ (item.item.0.idmap | default({})).base | default(0) }}"
-    group: "{{ (item.item.0.idmap | default({})).base | default(0) }}"
     state: directory
   when: "{{ item | changed }}"
   with_items: "{{ mount_dirs.results }}"
