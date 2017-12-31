@@ -200,7 +200,7 @@
     - guest-setup
 
 - name: autostart container
-  virt: name={{ item.name }} uri=lxc:/// command=autostart
+  command: "virsh -c lxc:/// autostart '{{ item.name }}'"
   with_items: "{{ containers }}"
   tags:
   - container-host
