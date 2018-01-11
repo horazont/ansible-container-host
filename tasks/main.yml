@@ -92,17 +92,6 @@
   tags:
   - container-host
 
-- name: add guests to host networks
-  command: virsh -c lxc:/// net-update {{ item.1.net }} add-last ip-dhcp-host "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip }}'/>" --live --config
-  register: add_guest
-  changed_when: "{{ add_guest.rc == 0 }}"
-  failed_when: False
-  with_subelements:
-  - "{{ containers }}"
-  - networks
-  tags:
-  - container-host
-
 - name: set host network to auto start
   command: virsh -c lxc:/// net-autostart {{ item.name }}
   args:

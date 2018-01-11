@@ -39,6 +39,13 @@
       {% if net.host_ifname | default("") %}
       <target dev="{{ net.host_ifname }}" />
       {% endif %}
+      {% set netobj = (networks | selectattr('name', 'equalto', net.net) | list)[0] %}
+      <ip family="ipv4" address="{{ net.ip4 }}" prefix="{{ netobj.ip4 | ipaddr('prefix') }}"/>
+      <route family="ipv4" address="0.0.0.0" prefix="0" gateway="{{ netobj.ip4 | ipaddr('address') }}"/>
+      {% if net.ip6 | default(False) %}
+      <ip family="ipv6" address="{{ net.ip6 }}" prefix="{{ netobj.ip6 | ipaddr('prefix') }}"/>
+      <route family="ipv6" address="2000::" prefix="3" gateway="fe80::1"/>
+      {% endif %}
     </interface>
     {% endfor %}
     <hostdev mode="capabilities" type="misc">

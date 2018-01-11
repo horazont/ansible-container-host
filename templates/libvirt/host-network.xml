@@ -5,15 +5,16 @@
     <nat>
     </nat>
   </forward>
+  <mac address="{{ item.mac }}"/>
   {% endif %}
   <bridge name="{{ item.iface }}" stp="on" delay="0" />
-  <ip address="{{ item.addr }}" netmask="{{ item.netmask }}">
-    <dhcp/>
+  <ip address="{{ item.ip4 | ipaddr('address') }}" netmask="{{ item.ip4 | ipaddr('netmask') }}">
   </ip>
   {% for route in item.routes | default([]) %}
   <route family="{{ route.family }}" address="{{ route.address }}" prefix="{{ route.prefix }}" gateway="{{ route.gateway }}"/>
   {% endfor %}
-  {% if item.ipv6_subnet | default(False) %}
-  <ip family="ipv6" address="{{ item.ipv6_subnet.split('/', 1)[0] }}" prefix="{{ item.ipv6_subnet.split('/', 1)[1] }}" />
+  {% if item.ip6 | default(False) %}
+  <ip family="ipv6" address="{{ item.ip6 | ipaddr('address') }}" prefix="{{ item.ip6 | ipaddr('prefix') }}" />
   {% endif %}
+  <ip family="ipv6" address="fe80::1" prefix="64"/>
 </network>
