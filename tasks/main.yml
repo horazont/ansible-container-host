@@ -1,14 +1,14 @@
 ---
 - name: install libvirt and tools
-  apt: name={{ item }} state=latest
-  when: ansible_pkg_mgr == "apt"
+  apt:
+    name: "{{ item }}"
+    state: latest
   with_items:
   - ebtables
   - dnsmasq-base
   - dns-root-data
   - debootstrap
   - rsync
-  - libvirt0
   - lxc
   - python-libvirt
   - python3
@@ -16,44 +16,50 @@
   tags:
   - container-host
 
-- name: install libvirt and tools
-  dnf: name={{ item }} state=latest
-  when: ansible_pkg_mgr == "dnf"
-  with_items:
-  - lxc
-  - lxc-templates
-  - libvirt
-  - libvirt-daemon-lxc
-  - libvirt-python
-  - python3
-  - debootstrap
-  tags:
-  - container-host
-
 - name: install debian 8 specific packages
-  apt: name={{ item }} state=latest
+  apt:
+    name: "{{ item }}"
+    state: latest
   when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
   with_items:
   - libvirt-bin
+  - libvirt0
+  tags:
+  - container-host
+
+- name: install debian 9 specific packages
+  apt:
+    name: "{{ item }}"
+    state: latest
+  when: ansible_distribution == "Debian" and ansible_distribution_release == "stretch"
+  with_items:
+  - libvirt-daemon-system
+  - libvirt-clients
   tags:
   - container-host
 
 - name: disable and stop dnsmasq
-  service: name=dnsmasq state=stopped enabled=no
+  service:
+    name: dnsmasq
+    state: stopped
+    enabled: no
   when: ansible_distribution == "Debian"
-  failed_when: "{{ False }}"
+  failed_when: "False"
   tags:
   - container-host
 
 - name: ensure libvirt is running
-  service: name=libvirtd state=running
+  service:
+    name: libvirtd
+    state: started
   tags:
   - container-host
 
 - name: ensure ansible working directory is present
-  file: path={{ persistent_ansible_directory }}/container-host/
-        mode=u=rwx,go-rwx
-        state=directory
+  file:
+    path: "{{ persistent_ansible_directory }}/container-host/"
+    mode: u=rwx,go-rwx
+    state: directory
   tags:
   - container-host
 
@@ -106,9 +112,10 @@
   - container-host
 
 - name: update grub config to generate cgroup_enable=memory
-  lineinfile: dest=/etc/default/grub
-              regexp='^GRUB_CMDLINE_LINUX='
-              line='GRUB_CMDLINE_LINUX="cgroup_enable=memory"'
+  lineinfile:
+    dest: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory"'
   register: grub_update
   when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
   tags:
@@ -193,21 +200,21 @@
   - guest-setup
 
 - name: start container
-  virt: state=running name={{ item.name }} uri=lxc:///
+  virt:
+    state: running
+    name: "{{ item.name }}"
+    autostart: true
+    uri: lxc:///
   with_items: "{{ containers }}"
   tags:
     - container-host
     - guest-setup
 
-- name: autostart container
-  command: "virsh -c lxc:/// autostart '{{ item.name }}'"
-  with_items: "{{ containers }}"
-  tags:
-  - container-host
-  - guest-setup
-
 - name: shellscript to connect to sshd
-  template: src=sshd-script dest=/usr/local/bin/virt-{{ item.name }}-sshd mode=ugo=rx
+  template:
+    src: sshd-script
+    dest: "/usr/local/bin/virt-{{ item.name }}-sshd"
+    mode: ugo=rx
   with_items: "{{ containers }}"
   tags:
   - container-host
