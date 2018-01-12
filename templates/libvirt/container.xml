@@ -40,9 +40,14 @@
       <target dev="{{ net.host_ifname }}" />
       {% endif %}
       {% set netobj = (networks | selectattr('name', 'equalto', net.net) | list)[0] %}
-      <ip family="ipv4" address="{{ net.ip4 | ipaddr('address') }}" prefix="{{ net.ip4 | ipaddr('prefix') }}"/>
+      {% if network.ip4 %}
+      {% set ip4addrs = [network.ip4] if network.ip4 is string else network.ip4 %}
+      {% for ip4 in ip4addrs %}
+      <ip family="ipv4" address="{{ ip4 | ipaddr('address') }}" prefix="{{ ip4 | ipaddr('prefix') }}"/>
+      {% endfor %}
       {% if netobj.mode | default('nat') != 'isolated' %}
       <route family="ipv4" address="0.0.0.0" prefix="0" gateway="{{ netobj.ip4 | ipaddr('address') }}"/>
+      {% endif %}
       {% endif %}
       {% if net.ip6 | default(False) %}
       <ip family="ipv6" address="{{ net.ip6 | ipaddr('address') }}" prefix="{{ netobj.ip6 | ipaddr('prefix') }}"/>
