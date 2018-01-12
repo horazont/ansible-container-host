@@ -1,11 +1,11 @@
 <network>
   <name>{{ item.name }}</name>
+  <mac address="{{ item.mac }}"/>
   {% if (item.mode | default("nat")) == "nat" %}
   <forward type="nat">
     <nat>
     </nat>
   </forward>
-  <mac address="{{ item.mac }}"/>
   {% endif %}
   <bridge name="{{ item.iface }}" stp="on" delay="0" />
   <ip address="{{ item.ip4 | ipaddr('address') }}" netmask="{{ item.ip4 | ipaddr('netmask') }}">
