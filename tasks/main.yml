@@ -79,6 +79,7 @@
   command: virsh -c lxc:/// net-define {{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml
   args:
     creates: /etc/libvirt/qemu/networks/{{ item.name }}.xml
+  notify: run ferm
   with_items: "{{ networks }}"
   tags:
   - container-host
@@ -195,6 +196,7 @@
     autostart: true
     uri: lxc:///
   with_items: "{{ containers }}"
+  notify: run ferm
   tags:
     - container-host
     - guest-setup
