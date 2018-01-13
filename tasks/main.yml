@@ -93,6 +93,18 @@
   tags:
   - container-host
 
+- name: add guests to host networks
+  command: virsh -c lxc:/// net-update {{ item.1.net }} add-last ip-dhcp-host "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip4 | ipaddr('address') }}'/>" --live --config
+  register: add_guest
+  when: not libvirt_lxc_addressing
+  changed_when: "add_guest.rc == 0"
+  failed_when: False
+  with_subelements:
+  - "{{ containers }}"
+  - networks
+  tags:
+  - container-host
+
 - name: set host network to auto start
   command: virsh -c lxc:/// net-autostart {{ item.name }}
   args:
@@ -104,8 +116,9 @@
 - name: update grub config to generate cgroup_enable=memory
   lineinfile:
     dest: /etc/default/grub
-    regexp: '^GRUB_CMDLINE_LINUX='
-    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory"'
+    backrefs: yes
+    regexp: '^GRUB_CMDLINE_LINUX="(cgroup_enable=memory)([^"]*)"'
+    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory\2"'
   register: grub_update
   when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
   tags:
