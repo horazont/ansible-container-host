@@ -273,6 +273,7 @@
     mode: u=rw,go-rwx
   tags:
   - container-host
+  - nat-forwarding
   - ferm
   notify:
   - run ferm
