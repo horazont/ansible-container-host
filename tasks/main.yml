@@ -38,6 +38,23 @@
   tags:
   - container-host
 
+- name: update grub config to generate cgroup_enable=memory
+  lineinfile:
+    dest: /etc/default/grub
+    backrefs: yes
+    regexp: '^GRUB_CMDLINE_LINUX="(cgroup_enable=memory)?\s?([^"]*)"'
+    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory \2"'
+  register: grub_update
+  when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
+  tags:
+  - container-host
+
+- name: re-generate grub config
+  command: update-grub
+  when: grub_update | changed
+  tags:
+  - container-host
+
 - name: disable and stop dnsmasq
   service:
     name: dnsmasq
@@ -110,23 +127,6 @@
   args:
     creates: /etc/libvirt/qemu/networks/autostart/{{ item.name }}.xml
   with_items: "{{ networks }}"
-  tags:
-  - container-host
-
-- name: update grub config to generate cgroup_enable=memory
-  lineinfile:
-    dest: /etc/default/grub
-    backrefs: yes
-    regexp: '^GRUB_CMDLINE_LINUX="(cgroup_enable=memory)([^"]*)"'
-    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory\2"'
-  register: grub_update
-  when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
-  tags:
-  - container-host
-
-- name: re-generate grub config
-  command: update-grub
-  when: grub_update | changed
   tags:
   - container-host
 
