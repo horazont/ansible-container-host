@@ -206,7 +206,6 @@
   virt:
     state: running
     name: "{{ item.name }}"
-    autostart: true
     uri: lxc:///
   with_items: "{{ containers }}"
   notify: run ferm
