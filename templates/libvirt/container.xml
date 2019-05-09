@@ -1,7 +1,10 @@
 <domain type="lxc">
   <name>{{ item.name }}</name>
   <title>{{ item.title }}</title>
-  <memory>262144</memory>
+  <memory>{{ item.memory }}</memory>
+  <memtune>
+    <swap_hard_limit unit="k">{{ "%d" | format((item.memory * 1.1) | round) }}</swap_hard_limit>
+  </memtune>
   <os>
     <type>exe</type>
     <init>/sbin/init</init>
