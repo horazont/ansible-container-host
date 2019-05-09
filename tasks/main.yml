@@ -38,12 +38,23 @@
   tags:
   - container-host
 
+- name: install debian 10 specific packages
+  apt:
+    name:
+    - libvirt-daemon-system
+    - libvirt-clients
+    - lxc-templates
+    state: latest
+  when: ansible_distribution == "Debian" and ansible_distribution_release == "buster"
+  tags:
+  - container-host
+
 - name: update grub config to generate cgroup_enable=memory
   lineinfile:
     dest: /etc/default/grub
     backrefs: yes
-    regexp: '^GRUB_CMDLINE_LINUX="(cgroup_enable=memory)?\s?([^"]*)"'
-    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory \2"'
+    regexp: '^GRUB_CMDLINE_LINUX="(cgroup_enable=memory swapaccount )?\s?([^"]*)"'
+    line: 'GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount \2"'
   register: grub_update
   when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
   tags:
@@ -93,8 +104,14 @@
   - container-host
 
 - name: bootstrap host network
-  command: virsh -c lxc:/// net-define {{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml
+  command:
   args:
+    argv:
+    - virsh
+    - "-c"
+    - lxc:///
+    - net-define
+    - "{{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml"
     creates: /etc/libvirt/qemu/networks/{{ item.name }}.xml
   notify: run ferm
   with_items: "{{ networks }}"
@@ -102,7 +119,14 @@
   - container-host
 
 - name: start host network
-  command: virsh -c lxc:/// net-start {{ item.name }}
+  command:
+  args:
+    argv:
+    - virsh
+    - "-c"
+    - lxc:///
+    - net-start
+    - "{{ item.name }}"
   with_items: "{{ networks }}"
   register: start_network
   changed_when: start_network.rc == 0
@@ -111,7 +135,19 @@
   - container-host
 
 - name: add guests to host networks
-  command: virsh -c lxc:/// net-update {{ item.1.net }} add-last ip-dhcp-host "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip4 | ipaddr('address') }}'/>" --live --config
+  command:
+  args:
+    argv:
+    - virsh
+    - "-c"
+    - lxc:///
+    - net-update
+    - "{{ item.1.net }}"
+    - add-last
+    - ip-dhcp-host
+    - "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip4 | ipaddr('address') }}'/>"
+    - "--live"
+    - "--config"
   register: add_guest
   when: not libvirt_lxc_addressing
   changed_when: "add_guest.rc == 0"
@@ -123,16 +159,31 @@
   - container-host
 
 - name: set host network to auto start
-  command: virsh -c lxc:/// net-autostart {{ item.name }}
+  command:
   args:
+    argv:
+    - virsh
+    - "-c"
+    - lxc:///
+    - net-autostart
+    - "{{ item.name }}"
     creates: /etc/libvirt/qemu/networks/autostart/{{ item.name }}.xml
   with_items: "{{ networks }}"
   tags:
   - container-host
 
 - name: create containers
-  command: lxc-create -t {{ item.template | default("debian") }} -n {{ item.rootfs_name }} -- --release {{ item.template_release | default("jessie") }}
+  command:
   args:
+    argv:
+    - lxc-create
+    - "-t"
+    - '{{ item.template | default("debian") }}'
+    - "-n"
+    - "{{ item.rootfs_name }}"
+    - "--"
+    - "--release"
+    - '{{ item.template_release | default("jessie") }}'
     creates: /var/lib/lxc/{{ item.rootfs_name }}
   with_items: "{{ containers }}"
   register: container_created
@@ -170,7 +221,12 @@
   - guest-setup
 
 - name: check if destination directories for fs mounts exist
-  command: test -d '/var/lib/lxc/{{ item.0.rootfs_name }}{{ item.1.guest }}'
+  command:
+  args:
+    argv:
+    - "test"
+    - "-d"
+    - '/var/lib/lxc/{{ item.0.rootfs_name }}{{ item.1.guest }}'
   register: mount_dirs
   changed_when: "mount_dirs.rc == 1"
   failed_when: "False"
@@ -277,3 +333,18 @@
   notify:
   - run ferm
   when: ferm
+
+- name: setup nft for nat port forwarding
+  template:
+    src: forwarding-nft.conf
+    dest: /etc/nft.d/05-container-forwarding.conf
+    owner: root
+    group: root
+    mode: u=rw,go-rwx
+  tags:
+  - container-host
+  - nat-forwarding
+  - nft
+  notify:
+  - reload nft
+  when: nft
