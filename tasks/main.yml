@@ -13,6 +13,7 @@
   - python-libvirt
   - python3
   - curl
+  - bridge-utils
   tags:
   - container-host
 
@@ -44,6 +45,7 @@
     - libvirt-daemon-system
     - libvirt-clients
     - lxc-templates
+    - systemd-container
     state: latest
   when: ansible_distribution == "Debian" and ansible_distribution_release == "buster"
   tags:
@@ -93,8 +95,8 @@
 
 - name: create host network configurations
   template:
-    src: libvirt/host-network.xml
-    dest: "{{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml"
+    src: bridge
+    dest: "/etc/network/interfaces.d/{{ item.iface}}"
     mode: u=r,go-rwx
     owner: root
     group: root
@@ -103,72 +105,28 @@
   tags:
   - container-host
 
-- name: bootstrap host network
-  command:
-  args:
-    argv:
-    - virsh
-    - "-c"
-    - lxc:///
-    - net-define
-    - "{{ persistent_ansible_directory }}/container-host/{{ item.name }}.xml"
-    creates: /etc/libvirt/qemu/networks/{{ item.name }}.xml
-  notify: run ferm
-  with_items: "{{ networks }}"
-  tags:
-  - container-host
-
 - name: start host network
   command:
   args:
     argv:
-    - virsh
-    - "-c"
-    - lxc:///
-    - net-start
-    - "{{ item.name }}"
-  with_items: "{{ networks }}"
-  register: start_network
-  changed_when: start_network.rc == 0
-  failed_when: "start_network.rc != 0 and 'is already active' not in start_network.stderr"
+    - ifup
+    - "{{ item.item.iface }}"
+  when: item is changed
+  with_items: "{{ host_network_changed.results }}"
   tags:
   - container-host
 
-- name: add guests to host networks
-  command:
-  args:
-    argv:
-    - virsh
-    - "-c"
-    - lxc:///
-    - net-update
-    - "{{ item.1.net }}"
-    - add-last
-    - ip-dhcp-host
-    - "<host mac='{{ item.1.mac }}' ip='{{ item.1.ip4 | ipaddr('address') }}'/>"
-    - "--live"
-    - "--config"
-  register: add_guest
-  when: not libvirt_lxc_addressing
-  changed_when: "add_guest.rc == 0"
-  failed_when: False
-  with_subelements:
-  - "{{ containers }}"
-  - networks
-  tags:
-  - container-host
-
-- name: set host network to auto start
-  command:
-  args:
-    argv:
-    - virsh
-    - "-c"
-    - lxc:///
-    - net-autostart
-    - "{{ item.name }}"
-    creates: /etc/libvirt/qemu/networks/autostart/{{ item.name }}.xml
-  with_items: "{{ networks }}"
+- name: deploy sysctl static settings
+  copy:
+    src: "{{ item }}.sysctl"
+    dest: "/etc/sysctl.d/{{ item }}.conf"
+    mode: u=r,go-rwx
+    owner: root
+    group: root
+  with_items:
+  - forwarding
+  notify:
+  - reapply sysctl
   tags:
   - container-host
 

@@ -3,6 +3,7 @@
   <title>{{ item.title }}</title>
   <memory>{{ item.memory }}</memory>
   <memtune>
+    <soft_limit unit="k">{{ "%d" | format((item.memory * 0.95) | round) }}</soft_limit>
     <swap_hard_limit unit="k">{{ "%d" | format((item.memory * 1.1) | round) }}</swap_hard_limit>
   </memtune>
   <os>
@@ -33,8 +34,9 @@
     </filesystem>
     {% endfor %}
     {% for net in item.networks %}
-    <interface type="network">
-      <source network="{{ net.net }}" />
+    {% set netobj = (networks | selectattr('name', 'equalto', net.net) | list)[0] %}
+    <interface type="bridge">
+      <source bridge="{{ netobj.iface }}" />
       <mac address="{{ net.mac }}"/>
       {% if net.guest_ifname | default("") %}
       <guest dev="{{ net.guest_ifname }}" />
@@ -42,7 +44,6 @@
       {% if net.host_ifname | default("") %}
       <target dev="{{ net.host_ifname }}" />
       {% endif %}
-      {% set netobj = (networks | selectattr('name', 'equalto', net.net) | list)[0] %}
       {% if net.ip4 %}
       {% set ip4addrs = [net.ip4] if net.ip4 is string else net.ip4 %}
       {% for ip4 in ip4addrs %}
