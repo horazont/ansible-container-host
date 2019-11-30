@@ -292,10 +292,10 @@
   - run ferm
   when: ferm
 
-- name: setup nft for nat port forwarding
+- name: setup nft rules
   template:
-    src: forwarding-nft.conf
-    dest: /etc/nft.d/05-container-forwarding.conf
+    src: "{{ item }}-nft.conf"
+    dest: "/etc/nft.d/05-container-{{ item }}.conf"
     owner: root
     group: root
     mode: u=rw,go-rwx
@@ -303,6 +303,9 @@
   - container-host
   - nat-forwarding
   - nft
+  with_items:
+  - forwarding
+  - spoofing-filter
   notify:
   - reload nft
   when: nft

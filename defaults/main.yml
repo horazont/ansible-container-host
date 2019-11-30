@@ -1,5 +1,7 @@
 ---
 nat_port_forwarding: []
 networks: []
+upstream_interface: eth0
 extra_forwarding: []
+extra_network_access: []
 libvirt_lxc_addressing: "{{ ansible_distribution == 'Debian' and (ansible_distribution_version | int) >= 9 }}"
