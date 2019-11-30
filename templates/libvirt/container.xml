@@ -4,7 +4,9 @@
   <memory>{{ item.memory }}</memory>
   <memtune>
     <soft_limit unit="k">{{ "%d" | format((item.memory * 0.95) | round) }}</soft_limit>
+{% if item.limit_swap | default(True) %}
     <swap_hard_limit unit="k">{{ "%d" | format((item.memory * 1.1) | round) }}</swap_hard_limit>
+{% endif %}
   </memtune>
   <os>
     <type>exe</type>
