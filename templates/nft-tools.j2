@@ -1,0 +1,15 @@
+{% macro solicit_mc(ip6, caller=None) %}
+{{ "ff02::1:ff00:0/104" | ipsubnet() | ipaddr((ip6 | ipaddr('address') | ipaddr('int') | int).__and__(16777215) | string) -}}
+{% endmacro %}
+{% macro macsuffix(mac, caller=None) %}
+{% set macparts = (mac | hwaddr).split(":") %}
+{% set p1 = ["%02x" | format((macparts[0] | int(base=16)).__xor__(2)), macparts[1]] | join("") %}
+{% set p2 = [macparts[2], "ff"] | join("") %}
+{% set p3 = ["fe", macparts[3]] | join("") %}
+{% set p4 = macparts[4:] | join("") %}
+{{ ("::" + ([p1, p2, p3, p4] | join(":"))) | ipaddr() -}}
+{% endmacro %}
+{% macro ip6_ll(mac, caller=None) %}
+{{ "fe80::/64" | ipsubnet() | ipaddr(macsuffix(mac) | ipaddr("int")) -}}
+{% endmacro %}
+
