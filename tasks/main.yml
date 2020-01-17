@@ -64,7 +64,7 @@
 
 - name: re-generate grub config
   command: update-grub
-  when: grub_update | changed
+  when: grub_update is changed
   tags:
   - container-host
 
@@ -151,7 +151,7 @@
 
 - name: rebase ids
   script: rebase-ids.py "/var/lib/lxc/{{ item.item.rootfs_name }}" "{{ item.item.idmap.base }}"
-  when: (item | changed) and (item.item.idmap | default(False))
+  when: (item is changed) and (item.item.idmap | default(False))
   with_items: "{{ container_created.results | default([]) }}"
   tags:
   - container-host
@@ -199,7 +199,7 @@
   file:
     path: "/var/lib/lxc/{{ item.item.0.rootfs_name }}{{ item.item.1.guest }}"
     state: directory
-  when: "item | changed"
+  when: "item is changed"
   with_items: "{{ mount_dirs.results }}"
   tags:
   - container-host
