@@ -1,0 +1,40 @@
+---
+- name: check disk image presence
+  stat:
+    path: "/var/lib/libvirt/images/{{ item.name }}.qcow2"
+  register: vm_disk_images
+  loop: "{{ vms }}"
+
+- name: download disk images if needed
+  get_url:
+    url: "{{ item.item.image.url }}"
+    checksum: "{{ item.item.image.checksum}}"
+    dest: "/var/lib/libvirt/images/{{ item.item.name }}.qcow2.xz"
+  loop: "{{ vm_disk_images.results }}"
+  when: not item.stat.exists
+  register: vm_disk_image_downloads
+
+- name: decompress disk images if needed
+  command:
+  args:
+    argv:
+    - xz
+    - "--decompress"
+    - "/var/lib/libvirt/images/{{ item.item.item.name }}.qcow2.xz"
+  loop: "{{ vm_disk_image_downloads.results }}"
+  when: item is changed
+
+- name: define machine
+  virt:
+    command: define
+    xml: '{{ lookup("template", "../templates/libvirt/vm.xml") }}'
+    uri: qemu:///system
+  loop: "{{ vms }}"
+
+- name: start machine
+  virt:
+    state: running
+    name: "{{ item.name }}"
+    uri: qemu:///system
+  loop: "{{ vms }}"
+  notify: run ferm

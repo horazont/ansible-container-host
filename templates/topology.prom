@@ -1,0 +1,6 @@
+# HELP z_topology_container Relationships between container hosts and their children
+# TYPE z_topology_container gauge
+z_topology_container{child="{{ inventory_hostname }}"} 1.0
+{% for container in containers %}
+z_topology_container{child="_{{ container.name }}.{{ inventory_hostname }}"} 1.0
+{% endfor %}

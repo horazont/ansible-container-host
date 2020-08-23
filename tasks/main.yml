@@ -102,6 +102,7 @@
     group: root
   register: host_network_changed
   with_items: "{{ networks }}"
+  when: "item.mode | default('nat') != 'bridge'"
   tags:
   - container-host
 
@@ -242,6 +243,7 @@
     state: present
     name: "{{ item.name }}-admin"
   with_items: "{{ containers }}"
+  when: "item.admin_group | default(True)"
   tags:
   - container-host
   - guest-setup
@@ -251,7 +253,6 @@
     owner: "{{ (item.idmap | default({})).base | default(0) }}"
     group: "{{ (item.idmap | default({})).base | default(0) }}"
     state: directory
-    recurse: yes
     path: "/var/lib/lxc/{{ item.rootfs_name }}/rootfs/root/.ssh/"
     mode: u=rwx,go-rwx
   with_items: "{{ containers }}"
@@ -276,6 +277,11 @@
   - guest-setup
   - guest-setup-admin-accounts
   - admin-accounts
+
+- include: vms.yml
+  tags:
+  - container-host
+  - container-host-vms
 
 - name: setup firewall for nat port forwarding
   template:
@@ -309,3 +315,14 @@
   notify:
   - reload nft
   when: nft
+
+- name: write topology metrics
+  template:
+    src: "topology.prom"
+    dest: /var/lib/prometheus/node-exporter/container-topology.prom
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  tags:
+  - container-host
+  - static-metrics

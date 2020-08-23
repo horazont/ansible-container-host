@@ -5,3 +5,5 @@ upstream_interface: eth0
 extra_forwarding: []
 extra_network_access: []
 libvirt_lxc_addressing: "{{ ansible_distribution == 'Debian' and (ansible_distribution_version | int) >= 9 }}"
+accelerated_virtualisation: False
+vms: []

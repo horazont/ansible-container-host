@@ -1,0 +1,52 @@
+<domain type="{{ 'kvm' if accelerated_virtualisation else 'qemu' }}">
+  <name>{{ item.name }}</name>
+  <title>{{ item.title }}</title>
+  <memory unit='KiB'>{{ item.memory }}</memory>
+  <vcpu placement='static'>{{ item.ncpus }}</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-2.8'>hvm</type>
+  </os>
+  <features>
+    <acpi/>
+  </features>
+  <clock offset="utc" />
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/{{ item.name }}.qcow2' />
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <cpu mode='host-passthrough'>
+      <model fallback='allow'/>
+    </cpu>
+    <controller type='usb' index='0' model='piix3-uhci' />
+    <controller type='pci' index='0' model='pci-root' />
+    <controller type='ide' index='0'>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
+    </controller>
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+    <graphics type='spice' autoport='yes'>
+      <listen type='address'/>
+      <image compression='off'/>
+    </graphics>
+    <memballoon model='none'/>
+    {% for net in item.networks %}
+    {% set netobj = (networks | selectattr('name', 'equalto', net.net) | list)[0] %}
+    <interface type="bridge">
+      <source bridge="{{ netobj.iface }}" />
+      <mac address="{{ net.mac }}"/>
+      {% if net.host_ifname | default("") %}
+      <target dev="{{ net.host_ifname }}" />
+      {% endif %}
+    </interface>
+    {% endfor %}
+  </devices>
+</domain>

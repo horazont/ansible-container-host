@@ -51,13 +51,14 @@
       {% for ip4 in ip4addrs %}
       <ip family="ipv4" address="{{ ip4 | ipaddr('address') }}" prefix="{{ ip4 | ipaddr('prefix') }}"/>
       {% endfor %}
-      {% if netobj.mode | default('nat') != 'isolated' %}
+      {% set network_mode = netobj.mode | default('nat') %}
+      {% if network_mode != "isolated" %}
       <route family="ipv4" address="0.0.0.0" prefix="0" gateway="{{ netobj.ip4 | ipaddr('address') }}"/>
       {% endif %}
       {% endif %}
       {% if net.ip6 | default(False) %}
       <ip family="ipv6" address="{{ net.ip6 | ipaddr('address') }}" prefix="{{ netobj.ip6 | ipaddr('prefix') }}"/>
-      {% if netobj.mode | default('nat') != 'isolated' %}
+      {% if network_mode != "isolated" %}
       <route family="ipv6" address="2000::" prefix="3" gateway="fe80::1"/>
       {% endif %}
       {% endif %}
