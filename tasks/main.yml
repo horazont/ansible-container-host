@@ -174,7 +174,19 @@
   with_subelements:
   - "{{ containers }}"
   - mounts
-  when: "item.set_uid | default(True)"
+  register: mount_sources
+  tags:
+  - container-host
+  - guest-setup
+
+- name: manage ownership of source directories for fs mounts if desired or newly created
+  file:
+    path: "{{ item.item.1.host }}"
+    state: directory
+    owner: "{{ item.item.1.owner }}"
+    group: "{{ item.item.1.group }}"
+  loop: "{{ mount_sources.results }}"
+  when: "item.item.1.set_uid | default(False) or item is changed"
   tags:
   - container-host
   - guest-setup
