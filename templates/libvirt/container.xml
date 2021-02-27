@@ -46,7 +46,7 @@
       {% if net.host_ifname | default("") %}
       <target dev="{{ net.host_ifname }}" />
       {% endif %}
-      {% if net.ip4 %}
+      {% if net.ip4 and (net.host_configure | default(True)) %}
       {% set ip4addrs = [net.ip4] if net.ip4 is string else net.ip4 %}
       {% for ip4 in ip4addrs %}
       <ip family="ipv4" address="{{ ip4 | ipaddr('address') }}" prefix="{{ ip4 | ipaddr('prefix') }}"/>
@@ -56,7 +56,7 @@
       <route family="ipv4" address="0.0.0.0" prefix="0" gateway="{{ netobj.ip4 | ipaddr('address') }}"/>
       {% endif %}
       {% endif %}
-      {% if net.ip6 | default(False) %}
+      {% if (net.ip6 | default(False)) and (net.host_configure | default(True)) %}
       <ip family="ipv6" address="{{ net.ip6 | ipaddr('address') }}" prefix="{{ netobj.ip6 | ipaddr('prefix') }}"/>
       {% if network_mode != "isolated" %}
       <route family="ipv6" address="2000::" prefix="3" gateway="fe80::1"/>
