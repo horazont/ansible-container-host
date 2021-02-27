@@ -1,41 +1,38 @@
 ---
 - name: install libvirt and tools
   apt:
-    name: "{{ item }}"
+    name:
+    - ebtables
+    - dnsmasq-base
+    - dns-root-data
+    - debootstrap
+    - rsync
+    - lxc
+    - python3-libvirt
+    - python3
+    - curl
+    - bridge-utils
     state: latest
-  with_items:
-  - ebtables
-  - dnsmasq-base
-  - dns-root-data
-  - debootstrap
-  - rsync
-  - lxc
-  - python-libvirt
-  - python3
-  - curl
-  - bridge-utils
   tags:
   - container-host
 
 - name: install debian 8 specific packages
   apt:
-    name: "{{ item }}"
+    name:
+    - libvirt-bin
+    - libvirt0
     state: latest
   when: ansible_distribution == "Debian" and ansible_distribution_release == "jessie"
-  with_items:
-  - libvirt-bin
-  - libvirt0
   tags:
   - container-host
 
 - name: install debian 9 specific packages
   apt:
-    name: "{{ item }}"
+    name:
+    - libvirt-daemon-system
+    - libvirt-clients
     state: latest
   when: ansible_distribution == "Debian" and ansible_distribution_release == "stretch"
-  with_items:
-  - libvirt-daemon-system
-  - libvirt-clients
   tags:
   - container-host
 
