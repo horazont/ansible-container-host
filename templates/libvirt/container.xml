@@ -1,11 +1,12 @@
 <domain type="lxc">
   <name>{{ item.name }}</name>
   <title>{{ item.title }}</title>
-  <memory>{{ item.memory }}</memory>
+{% set memory_max = item.memory_max_override | default(item.memory) %}
+  <memory>{{ memory_max }}</memory>
   <memtune>
     <soft_limit unit="k">{{ "%d" | format((item.memory * 0.95) | round) }}</soft_limit>
 {% if item.limit_swap | default(True) %}
-    <swap_hard_limit unit="k">{{ "%d" | format((item.memory * 1.1) | round) }}</swap_hard_limit>
+    <swap_hard_limit unit="k">{{ "%d" | format((memory_max * 1.1) | round) }}</swap_hard_limit>
 {% endif %}
   </memtune>
   <os>
