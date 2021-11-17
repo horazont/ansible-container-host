@@ -48,6 +48,19 @@
   tags:
   - container-host
 
+- name: install debian 11 specific packages
+  apt:
+    name:
+    - libvirt-daemon-system
+    - libvirt-daemon-driver-lxc
+    - libvirt-clients
+    - lxc-templates
+    - systemd-container
+    state: latest
+  when: ansible_distribution == "Debian" and ansible_distribution_release == "bullseye"
+  tags:
+  - container-host
+
 - name: update grub config to generate cgroup_enable=memory
   lineinfile:
     dest: /etc/default/grub
