@@ -13,5 +13,6 @@ iface {{ item.iface }} inet static
 {% if item.ip6 | default(False) %}
 iface {{ item.iface }} inet6 static
     address {{ item.ip6 }}
-    post-up ip addr add fe80::1/64 dev {{ item.iface }}
+    post-up ip addr add fe80::1/64 dev {{ item.iface }} nodad
+    dad-attempts 0
 {% endif %}
